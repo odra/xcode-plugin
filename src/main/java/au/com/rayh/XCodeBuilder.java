@@ -59,6 +59,8 @@ import java.util.UUID;
 import java.util.Collection;
 import java.util.concurrent.TimeUnit;
 
+import org.jenkinsci.Symbol;
+
 /**
  * @author Ray Hilton
  */
@@ -203,7 +205,7 @@ public class XCodeBuilder extends Builder implements SimpleBuildStep {
      * @since 1.5
      */
     public final String ipaManifestPlistUrl;
-
+    
     // Fields in config.jelly must match the parameter names in the "DataBoundConstructor"
     @DataBoundConstructor
     public XCodeBuilder(Boolean buildIpa, Boolean generateArchive, Boolean cleanBeforeBuild, Boolean cleanTestReports, String configuration,
@@ -486,6 +488,7 @@ public class XCodeBuilder extends Builder implements SimpleBuildStep {
                 listener.fatalError(Messages.XCodeBuilder_keychainNotConfigured());
                 return false;
             }
+
             String keychainPath = envs.expand(keychain.getKeychainPath());
             String keychainPwd = envs.expand(keychain.getKeychainPassword());
             launcher.launch().envs(envs).cmds("/usr/bin/security", "list-keychains", "-s", keychainPath).stdout(listener).pwd(projectRoot).join();
@@ -872,6 +875,7 @@ public class XCodeBuilder extends Builder implements SimpleBuildStep {
     public Team getDevelopmentTeam() {
         if(!StringUtils.isEmpty(developmentTeamName)) {
             for (Team team : getGlobalConfiguration().getTeams()) {
+                System.out.println(team.getTeamID() + ":" + team.getTeamName());
                 if(team.getTeamName().equals(developmentTeamName))
                     return team;
             }

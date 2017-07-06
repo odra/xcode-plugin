@@ -1,0 +1,138 @@
+package au.com.rayh;
+
+import com.google.inject.Inject;
+import hudson.EnvVars;
+import hudson.Extension;
+import hudson.FilePath;
+import hudson.Launcher;
+import hudson.model.Run;
+import hudson.model.TaskListener;
+import org.jenkinsci.plugins.workflow.steps.AbstractStepDescriptorImpl;
+import org.jenkinsci.plugins.workflow.steps.AbstractStepImpl;
+import org.jenkinsci.plugins.workflow.steps.AbstractSynchronousNonBlockingStepExecution;
+import org.jenkinsci.plugins.workflow.steps.StepContextParameter;
+import org.kohsuke.stapler.DataBoundConstructor;
+import org.kohsuke.stapler.DataBoundSetter;
+
+import javax.annotation.Nonnull;
+
+/**
+ * Created by lrossett on 7/4/17.
+ */
+public class CodeSignStep extends AbstractStepImpl {
+    private String profileId;
+    private boolean clean = true;
+    private String bundleId;
+    private boolean verify = true;
+    private String ipaName;
+    private String appPath;
+
+    @DataBoundSetter
+    public void setProfileId(String value) {
+        this.profileId = value;
+    }
+
+    @DataBoundSetter
+    public void setClean(boolean value) {
+        this.clean = value;
+    }
+
+    @DataBoundSetter
+    public void setBundleId(String value) {
+        this.bundleId = value;
+    }
+
+    @DataBoundSetter
+    public  void setVerify(boolean value) {
+        this.verify = value;
+    }
+
+    @DataBoundSetter
+    public void setIpaName(String value) {
+        this.ipaName = value;
+    }
+
+    @DataBoundSetter
+    public void setAppPath(String value) {
+        this.appPath = value;
+    }
+
+    @DataBoundConstructor
+    public CodeSignStep() {}
+
+    private static class CodeSigntepExecution extends AbstractSynchronousNonBlockingStepExecution<Void> {
+        private static final long serialVersionUID = 1L;
+
+        @Inject
+        private transient CodeSignStep step;
+
+        @StepContextParameter
+        @SuppressWarnings("unused")
+        private transient Run build;
+
+        @StepContextParameter
+        @SuppressWarnings("unused")
+        private transient FilePath workspace;
+
+        @StepContextParameter
+        @SuppressWarnings("unused")
+        private transient Launcher launcher;
+
+        @StepContextParameter
+        @SuppressWarnings("unused")
+        private transient TaskListener listener;
+
+        @StepContextParameter
+        private transient EnvVars env;
+
+        @Override
+        protected Void run() throws Exception {
+            String profileId = step.profileId;
+            boolean clean = step.clean;
+            String bundleId = step.bundleId;
+            boolean verify = step.verify;
+            String ipaName = step.ipaName;
+            String appPath = step.appPath;
+            String buildName = build.getFullDisplayName();
+            String keychainName = "jenkins-" + buildName.replace('/', '-');
+
+            DeveloperProfileLoader profileLoader = new DeveloperProfileLoader(profileId);
+            profileLoader.setProjectScope(false);
+            profileLoader.perform(build, workspace, launcher, listener);
+
+            CodeSignWrapper codesign = new CodeSignWrapper(appPath, keychainName, profileLoader.getSecretDir(workspace));
+            codesign.perform(build, workspace, launcher, listener);
+
+            System.out.println("Should clean: " + clean);
+            System.out.println("App bundle id: " + bundleId);
+            System.out.println("Should verify: " + verify);
+            System.out.println("Final IPA name: " + ipaName);
+            System.out.println("App path:"  + appPath);
+
+            profileLoader.unload(workspace, launcher, listener);
+
+            return null;
+        }
+    }
+
+    @Extension(optional = true)
+    public static class DescriptorImpl extends AbstractStepDescriptorImpl {
+        private static String DISPLAY_NAME = "CodeSign";
+        private static String FN_NAME = "codeSign";
+
+        public DescriptorImpl() {
+            super(CodeSignStep.CodeSigntepExecution.class);
+        }
+
+        @Override
+        public String getFunctionName() {
+            return FN_NAME;
+        }
+
+        @Nonnull
+        @Override
+        public String getDisplayName() {
+            return DISPLAY_NAME;
+        }
+    }
+}

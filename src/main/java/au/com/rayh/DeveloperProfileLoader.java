@@ -27,14 +27,10 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.security.GeneralSecurityException;
-import java.security.cert.X509Certificate;
-import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import hudson.model.Run;
 import hudson.model.TaskListener;
-import sun.java2d.loops.FillRect;
 
 import javax.annotation.Nonnull;
 
@@ -61,10 +57,6 @@ public class DeveloperProfileLoader extends Builder implements SimpleBuildStep {
 
     public void setProjectScope(boolean value) {
         this.isProjectScoped = value;
-    }
-
-    public void setKeychainPassword(String value) {
-        this.keychainPassword = value;
     }
 
     @Override
@@ -109,6 +101,12 @@ public class DeveloperProfileLoader extends Builder implements SimpleBuildStep {
         } else {
             keychainPass = UUID.randomUUID().toString();
         }
+
+        //keychainPass = "12345";
+
+        System.out.println("---" + keychainPass + "---");
+
+        this.keychainPassword = keychainPass;
 
         ArgumentListBuilder args;
 
@@ -171,6 +169,12 @@ public class DeveloperProfileLoader extends Builder implements SimpleBuildStep {
             }
             mp.copyTo(profiles.child(this.provisioningpProfileName));
         }
+
+        if (!this.isProjectScoped) {
+            this.setPerms(launcher, listener);
+            this.enableTempKeychain(launcher, listener, filePath);
+            this.importAppleCert(launcher, listener, filePath);
+        }
     }
 
     private ByteArrayOutputStream invoke(Launcher launcher, TaskListener listener, ArgumentListBuilder args, String errorMessage) throws IOException, InterruptedException {
@@ -182,11 +186,17 @@ public class DeveloperProfileLoader extends Builder implements SimpleBuildStep {
         return output;
     }
 
-    private FilePath getSecretDir(FilePath path,  String keychainPass) throws IOException, InterruptedException {
+    protected FilePath getSecretDir(FilePath path,  String keychainPass) throws IOException, InterruptedException {
         FilePath secrets = path.child("developer-profiles");
         secrets.mkdirs();
         secrets.chmod(0700);
         return secrets.child(keychainPass);
+    }
+
+    public FilePath getSecretDir(FilePath path) throws IOException, InterruptedException {
+        System.out.println(path.getRemote());
+        System.out.println(this.keychainPassword);
+        return this.getSecretDir(path, this.keychainPassword);
     }
 
     public DeveloperProfile getProfile() {
@@ -221,11 +231,56 @@ public class DeveloperProfileLoader extends Builder implements SimpleBuildStep {
         ArgumentListBuilder args = new ArgumentListBuilder("security", "delete-keychain", this.keychainName);
         ByteArrayOutputStream output = invoke(launcher, listener, args, "Failed to remove keychain");
         listener.getLogger().write(output.toByteArray());
-        VirtualChannel ch = filePath.getChannel();
         filePath
-                .getHomeDirectory(ch)
+                .getHomeDirectory(filePath.getChannel())
                 .child("Library/MobileDevice/Provisioning Profiles")
                 .child(this.provisioningpProfileName).delete();
+        FilePath profilePath = this.getSecretDir(filePath, this.keychainPassword);
+        profilePath.deleteRecursive();
+    }
+
+    public void setPerms(Launcher launcher, TaskListener listener) throws IOException, InterruptedException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        launcher
+                .launch()
+                .cmds("security", "set-key-partition-list", "-S", "apple-tool:,apple:,codesign:", "-k", this.keychainPassword, this.keychainName)
+                .stdout(out)
+                .join();
+        listener.getLogger().write(out.toByteArray());
+    }
+
+    public void enableTempKeychain(Launcher launcher, TaskListener listener, FilePath workspace) throws IOException, InterruptedException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ByteArrayOutputStream err = new ByteArrayOutputStream();
+
+        FilePath homeFolder = workspace.getHomeDirectory(workspace.getChannel());
+        String homePath = homeFolder.getRemote();
+
+        launcher
+                .launch()
+                .cmds("security", "list-keychain", "-d", "user", "-s", homePath + "/Library/Keychains/" + this.keychainName)
+                .stdout(out)
+                .stderr(err)
+                .join();
+        if (err.size() > 0) {
+            listener.getLogger().write(err.toByteArray());
+        } else {
+            listener.getLogger().write(out.toByteArray());
+        }
+    }
+
+    public void importAppleCert(Launcher launcher, TaskListener listener, FilePath workspace) throws IOException, InterruptedException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        FilePath homeFolder = workspace.getHomeDirectory(workspace.getChannel());
+        String homePath = homeFolder.getRemote();
+
+        String cert = homePath + "/AppleWWDRCA.cer";
+        launcher
+                .launch()
+                .cmds("security", "import", cert, "-k", this.keychainName)
+                .stdout(out)
+                .join();
+        listener.getLogger().write(out.toByteArray());
     }
 
     @Extension

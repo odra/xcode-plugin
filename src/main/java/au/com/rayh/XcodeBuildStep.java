@@ -21,12 +21,12 @@ import hudson.model.TaskListener;
 
 public class XcodeBuildStep extends AbstractStepImpl {
     private boolean cleanBuild = true;
-    public String developerProfileId;
+    //public String developerProfileId;
     private String bundleId;
     private String buildDir = "./build";
     private String teamId;
     private String teamName;
-    private String exportMethod = "ad-hoc";
+    private String exportMethod;
     private String src = "src";
     private String sdk = "iphoneos";
     private String outputDir = buildDir +  "/Release";
@@ -40,11 +40,12 @@ public class XcodeBuildStep extends AbstractStepImpl {
     private String shortVersion;
     private String infoPlistPath;
     private String keychainPassword;
+    private boolean autoSign;
 
-    @DataBoundSetter
+    /*@DataBoundSetter
     public void setDeveloperProfileId(String value) {
     this.developerProfileId = value;
-  }
+  }*/
 
     @DataBoundSetter
     public void setCleanBuild(boolean value) {
@@ -141,6 +142,11 @@ public class XcodeBuildStep extends AbstractStepImpl {
         this.keychainPassword = value;
     }
 
+    @DataBoundSetter
+    public void setAutoSign(boolean value) {
+        this.autoSign = value;
+    }
+
     @DataBoundConstructor
     public XcodeBuildStep() {}
 
@@ -206,11 +212,6 @@ public class XcodeBuildStep extends AbstractStepImpl {
             String ipaManifestPlistUrl = "";
             Boolean interpretTargetAsRegEx = false;
 
-            DeveloperProfileLoader profileLoader = new DeveloperProfileLoader(step.developerProfileId);
-            profileLoader.setProjectScope(false);
-            profileLoader.setKeychainPassword(keychainPwd);
-            profileLoader.perform(build, workspace, launcher, listener);
-
             XCodeBuilder builder = new XCodeBuilder(buildIpa, generateArchive, cleanBeforeBuild, cleanTestReports, configuration,
                     target, sdk, xcodeProjectPath, xcodeProjectFile, xcodebuildArguments,
                     cfBundleVersionValue, cfBundleShortVersionStringValue, unlockKeychain,
@@ -218,8 +219,8 @@ public class XcodeBuildStep extends AbstractStepImpl {
                     xcodeSchema, configurationBuildDir, step.teamName, step.teamId, allowFailingBuildResults,
                     ipaName, provideApplicationVersion, ipaOutputDirectory, changeBundleID, bundleID,
                     bundleIDInfoPlistPath, ipaManifestPlistUrl, interpretTargetAsRegEx, step.exportMethod);
+            builder.shouldCodeSign = step.autoSign;
             builder.perform(build, workspace, launcher, listener);
-            profileLoader.unload(workspace, launcher, listener);
 
             return null;
         }

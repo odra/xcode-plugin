@@ -22,7 +22,6 @@ import javax.annotation.Nonnull;
 public class CodeSignStep extends AbstractStepImpl {
     private String profileId;
     private boolean clean = true;
-    private String bundleId;
     private boolean verify = true;
     private String ipaName;
     private String appPath;
@@ -35,11 +34,6 @@ public class CodeSignStep extends AbstractStepImpl {
     @DataBoundSetter
     public void setClean(boolean value) {
         this.clean = value;
-    }
-
-    @DataBoundSetter
-    public void setBundleId(String value) {
-        this.bundleId = value;
     }
 
     @DataBoundSetter
@@ -89,7 +83,6 @@ public class CodeSignStep extends AbstractStepImpl {
         protected Void run() throws Exception {
             String profileId = step.profileId;
             boolean clean = step.clean;
-            String bundleId = step.bundleId;
             boolean verify = step.verify;
             String ipaName = step.ipaName;
             String appPath = step.appPath;
@@ -100,14 +93,13 @@ public class CodeSignStep extends AbstractStepImpl {
             profileLoader.setProjectScope(false);
             profileLoader.perform(build, workspace, launcher, listener);
 
-            CodeSignWrapper codesign = new CodeSignWrapper(appPath, keychainName, profileLoader.getSecretDir(workspace));
+            CodeSignWrapper codesign = new CodeSignWrapper(appPath,
+                    keychainName,
+                    profileLoader.getSecretDir(workspace),
+                    clean,
+                    verify,
+                    ipaName);
             codesign.perform(build, workspace, launcher, listener);
-
-            System.out.println("Should clean: " + clean);
-            System.out.println("App bundle id: " + bundleId);
-            System.out.println("Should verify: " + verify);
-            System.out.println("Final IPA name: " + ipaName);
-            System.out.println("App path:"  + appPath);
 
             profileLoader.unload(workspace, launcher, listener);
 

@@ -1,6 +1,7 @@
 package au.com.rayh;
 
 import com.cloudbees.plugins.credentials.CredentialsProvider;
+import com.cloudbees.plugins.credentials.CredentialsScope;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import hudson.AbortException;
 import hudson.Extension;
@@ -102,10 +103,6 @@ public class DeveloperProfileLoader extends Builder implements SimpleBuildStep {
             keychainPass = UUID.randomUUID().toString();
         }
 
-        //keychainPass = "12345";
-
-        System.out.println("---" + keychainPass + "---");
-
         this.keychainPassword = keychainPass;
 
         ArgumentListBuilder args;
@@ -131,7 +128,7 @@ public class DeveloperProfileLoader extends Builder implements SimpleBuildStep {
         try {
             secret.unzipFrom(new ByteArrayInputStream(dp.getImage()));
         } catch (NullPointerException e) {
-            throw  new AbortException("Unable to read developer profile file.");
+            throw new AbortException("Unable to read developer profile file.");
         }
 
         // import identities
@@ -194,8 +191,6 @@ public class DeveloperProfileLoader extends Builder implements SimpleBuildStep {
     }
 
     public FilePath getSecretDir(FilePath path) throws IOException, InterruptedException {
-        System.out.println(path.getRemote());
-        System.out.println(this.keychainPassword);
         return this.getSecretDir(path, this.keychainPassword);
     }
 

@@ -30,11 +30,17 @@ public class CodeSignWrapper extends Builder implements SimpleBuildStep {
     public String keychainName;
     private FilePath binaryPath;
     private FilePath resourcesPath;
+    private boolean shouldClean;
+    private boolean shouldVerify;
+    private String ipaName;
 
-    CodeSignWrapper(String appPath, String keychainName, FilePath resourcesPath) {
+    CodeSignWrapper(String appPath, String keychainName, FilePath resourcesPath, boolean shouldClean, boolean shouldVerify, String ipaName) {
         this.appPath = appPath;
         this.keychainName = keychainName;
         this.resourcesPath = resourcesPath;
+        this.shouldClean = shouldClean;
+        this.shouldVerify = shouldVerify;
+        this.ipaName = ipaName;
     }
 
     @Override
@@ -113,7 +119,7 @@ public class CodeSignWrapper extends Builder implements SimpleBuildStep {
     }
 
     public void setEmbeddedProfile() throws IOException, InterruptedException {
-        FilePath[] folders = this.resourcesPath.list("*.mobileprovision");
+        FilePath[] folders = this.resourcesPath.list("**/*.mobileprovision");
 
         if (folders.length == 0) {
             throw  new AbortException("Provisioning profile not found");
@@ -194,7 +200,7 @@ public class CodeSignWrapper extends Builder implements SimpleBuildStep {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         launcher
                 .launch()
-                .cmds("security", "find-identity", "-p", "codesigning", "-v", this.keychainName, "|", "perl", "-nle", "print $1 if m{^\\d\\)\\s+([a-zA-Z0-9]+)\\s+}")
+                .cmds("security", "find-identity", "-p", "codesigning", "-v", this.keychainName)
                 .stdout(out)
                 .join();
 
@@ -255,10 +261,18 @@ public class CodeSignWrapper extends Builder implements SimpleBuildStep {
         }
     }
 
+    public String getIpaName() {
+        String remotePath = this.binaryPath.getRemote();
+
+        if (this.ipaName != null) {
+            return remotePath.replace(this.binaryPath.getName(), ipaName);
+        }
+
+        return remotePath.replace(".app", "");
+    }
+
     @SuppressFBWarnings("DM_DEFAULT_ENCODING")
     private boolean _perform(Run<?,?> build, FilePath projectRoot, Launcher launcher, EnvVars envs, TaskListener listener) throws InterruptedException, IOException {
-        System.out.println(this.keychainName + this.appPath);
-
         String path = this.appPath;
 
         if (path == null) {
@@ -273,7 +287,10 @@ public class CodeSignWrapper extends Builder implements SimpleBuildStep {
 
         this.binaryPath = binaryPath;
 
-        this.clean();
+        if (this.shouldClean) {
+            this.clean();
+        }
+
         this.setEmbeddedProfile();
         this.setEntitlements(launcher, projectRoot);
         this.showValidIdentities(launcher, listener);
@@ -291,9 +308,11 @@ public class CodeSignWrapper extends Builder implements SimpleBuildStep {
 
         this.sign(launcher, listener, identifier,  projectRoot.child("entitlements.plist").getRemote(), binaryPath.getRemote());
 
-        this.checkSignature(launcher, listener, binaryPath.getRemote());
+        if (this.shouldVerify) {
+            this.checkSignature(launcher, listener, binaryPath.getRemote());
+        }
 
-        this.createIpa(launcher, listener, this.binaryPath.getRemote().replace(".app", ""));
+        this.createIpa(launcher, listener, this.getIpaName());
 
         return true;
     }

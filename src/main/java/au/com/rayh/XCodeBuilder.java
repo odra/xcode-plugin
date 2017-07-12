@@ -207,6 +207,10 @@ public class XCodeBuilder extends Builder implements SimpleBuildStep {
     public final String ipaManifestPlistUrl;
 
     public boolean shouldCodeSign;
+
+    private String flags;
+
+    private EnvVars env;
     
     // Fields in config.jelly must match the parameter names in the "DataBoundConstructor"
     @DataBoundConstructor
@@ -271,6 +275,14 @@ public class XCodeBuilder extends Builder implements SimpleBuildStep {
                 bundleIDInfoPlistPath, ipaManifestPlistUrl, interpretTargetAsRegEx, "ad-hoc");
     }
 
+    public void setFlags(String flags) {
+        this.flags = flags;
+    }
+
+    public void setEnv(EnvVars env) {
+        this.env = env;
+    }
+
     @SuppressWarnings("unused")
     private Object readResolve() throws ObjectStreamException {
         if (provideApplicationVersion == null) {
@@ -284,17 +296,18 @@ public class XCodeBuilder extends Builder implements SimpleBuildStep {
 
     @Override
     public void perform(Run<?, ?> build, FilePath filePath, Launcher launcher, TaskListener listener) throws InterruptedException, IOException {
-		_perform(build, filePath, launcher, build.getEnvironment(listener), listener);
+		EnvVars env = this.env != null ? this.env :  build.getEnvironment(listener);
+        _perform(build, filePath, launcher, env, listener);
     }
 
     @Override
     public boolean perform(AbstractBuild build, Launcher launcher, BuildListener listener) throws InterruptedException, IOException {
-		return _perform(build, build.getWorkspace(), launcher, build.getEnvironment(listener), listener);
+        EnvVars env = this.env != null ? this.env :  build.getEnvironment(listener);
+        return _perform(build, build.getWorkspace(), launcher, env, listener);
 	}
 
     @SuppressFBWarnings("DM_DEFAULT_ENCODING")
     private boolean _perform(Run<?,?> build, FilePath projectRoot, Launcher launcher, EnvVars envs, TaskListener listener) throws InterruptedException, IOException {
-
         // check that the configured tools exist
         if (!new FilePath(projectRoot.getChannel(), getGlobalConfiguration().getXcodebuildPath()).exists()) {
             listener.fatalError(Messages.XCodeBuilder_xcodebuildNotFound(getGlobalConfiguration().getXcodebuildPath()));
@@ -680,6 +693,10 @@ public class XCodeBuilder extends Builder implements SimpleBuildStep {
             commandLine.add("CODE_SIGN_IDENTITY=");
             commandLine.add("CODE_SIGNING_REQUIRED=NO");
             commandLine.add("DEVELOPMENT_TEAM=" + developmentTeamID);
+        }
+
+        if (this.flags != null) {
+            commandLine.add(this.flags);
         }
 
         listener.getLogger().println(xcodeReport.toString());

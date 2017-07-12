@@ -21,7 +21,6 @@ import hudson.model.TaskListener;
 
 public class XcodeBuildStep extends AbstractStepImpl {
     private boolean cleanBuild = true;
-    //public String developerProfileId;
     private String bundleId;
     private String buildDir = "./build";
     private String teamId;
@@ -40,12 +39,8 @@ public class XcodeBuildStep extends AbstractStepImpl {
     private String shortVersion;
     private String infoPlistPath;
     private String keychainPassword;
+    private String flags;
     private boolean autoSign;
-
-    /*@DataBoundSetter
-    public void setDeveloperProfileId(String value) {
-    this.developerProfileId = value;
-  }*/
 
     @DataBoundSetter
     public void setCleanBuild(boolean value) {
@@ -147,6 +142,11 @@ public class XcodeBuildStep extends AbstractStepImpl {
         this.autoSign = value;
     }
 
+    @DataBoundSetter
+    public void setFlags(String flags) {
+        this.flags = flags;
+    }
+
     @DataBoundConstructor
     public XcodeBuildStep() {}
 
@@ -211,6 +211,7 @@ public class XcodeBuildStep extends AbstractStepImpl {
             String bundleIDInfoPlistPath = step.infoPlistPath;
             String ipaManifestPlistUrl = "";
             Boolean interpretTargetAsRegEx = false;
+            String flags = step.flags;
 
             XCodeBuilder builder = new XCodeBuilder(buildIpa, generateArchive, cleanBeforeBuild, cleanTestReports, configuration,
                     target, sdk, xcodeProjectPath, xcodeProjectFile, xcodebuildArguments,
@@ -220,10 +221,27 @@ public class XcodeBuildStep extends AbstractStepImpl {
                     ipaName, provideApplicationVersion, ipaOutputDirectory, changeBundleID, bundleID,
                     bundleIDInfoPlistPath, ipaManifestPlistUrl, interpretTargetAsRegEx, step.exportMethod);
             builder.shouldCodeSign = step.autoSign;
+            builder.setFlags(flags);
+
+            String xcVersion = env.get("XC_VERSION");
+            if (xcVersion != null) {
+                this.updateXcodeVersion(xcVersion);
+            }
+
+            builder.setEnv(env);
             builder.perform(build, workspace, launcher, listener);
 
             return null;
         }
+
+        public void updateXcodeVersion(String version) {
+            if (this.env == null) {
+                return;
+            }
+            String xcEnv = "/Applications/Xcode-" + version + ".app/Contents/Developer";
+            env.override("DEVELOPER_DIR", xcEnv);
+        }
+
     }
 
     @Extension(optional = true)

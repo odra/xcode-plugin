@@ -45,6 +45,7 @@ import au.com.rayh.report.TestCase;
 import au.com.rayh.report.TestError;
 import au.com.rayh.report.TestFailure;
 import au.com.rayh.report.TestSuite;
+import jdk.nashorn.internal.runtime.ParserException;
 
 /**
  * Parse Xcode output and transform into JUnit-style xml test result files.
@@ -103,7 +104,7 @@ public class XCodeBuildOutputParser {
                 try {
                     handleLine(buffer.toString());
                     buffer = new StringBuilder();
-                } catch(Exception e) {  // Very fugly
+                } catch(ParseException | InterruptedException | JAXBException e) {
                     throw new IOException(e);
                 }
             } else {

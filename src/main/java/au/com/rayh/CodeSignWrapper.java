@@ -13,10 +13,8 @@ import hudson.tasks.Builder;
 import hudson.util.ArgumentListBuilder;
 import jenkins.tasks.SimpleBuildStep;
 
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -26,6 +24,7 @@ import java.util.regex.Pattern;
 public class CodeSignWrapper extends Builder implements SimpleBuildStep {
     private static final String SIGNATURE_FILE = "_CodeSignature";
     private static final String PROFILE_FILE = "embedded.mobileprovision";
+    private static final String ENTITLEMENTS_PLIST_PATH = "entitlements.plist";
     public String appPath;
     public String keychainName;
     private FilePath binaryPath;
@@ -149,7 +148,7 @@ public class CodeSignWrapper extends Builder implements SimpleBuildStep {
                 .cmds("/usr/libexec/PlistBuddy", "-x", "-c", "Print :Entitlements", projectRoot.child("temp.plist").getRemote())
                 .stdout(entitlementsStdout)
                 .join();
-        projectRoot.child("entitlements.plist").write(entitlementsStdout.toString(), "utf-8");
+        projectRoot.child(ENTITLEMENTS_PLIST_PATH).write(entitlementsStdout.toString(), "utf-8");
     }
 
     public void sign(Launcher launcher, TaskListener listener, String config, String entitlements, String target) throws IOException, InterruptedException {
@@ -234,18 +233,37 @@ public class CodeSignWrapper extends Builder implements SimpleBuildStep {
         }
     }
 
+    public void showAppInfo(Launcher launcher, TaskListener listener, String target) throws IOException, InterruptedException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ByteArrayOutputStream err = new ByteArrayOutputStream();
+
+        launcher
+                .launch()
+                .cmds("codesign", "-vvvv", "-d", target)
+                .stdout(out)
+                .stderr(err)
+                .join();
+        if (err.size() > 0) {
+            listener.getLogger().write(err.toByteArray());
+        } else {
+            listener.getLogger().write(out.toByteArray());
+        }
+    }
+
     public void createIpa(Launcher launcher, TaskListener listener, String dest) throws IOException, InterruptedException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ByteArrayOutputStream err = new ByteArrayOutputStream();
 
         FilePath payloadFolder = this.binaryPath.getParent().child("Payload");
+        FilePath appFolder = payloadFolder.child(this.binaryPath.getName());
 
         if (payloadFolder.exists()) {
             payloadFolder.deleteRecursive();
         }
 
         payloadFolder.mkdirs();
-        this.binaryPath.copyRecursiveTo(payloadFolder);
+        appFolder.mkdirs();
+        this.binaryPath.copyRecursiveTo(appFolder);
 
         launcher
                 .launch()
@@ -265,7 +283,7 @@ public class CodeSignWrapper extends Builder implements SimpleBuildStep {
         String remotePath = this.binaryPath.getRemote();
 
         if (this.ipaName != null) {
-            return remotePath.replace(this.binaryPath.getName(), ipaName);
+            return remotePath.replace(this.binaryPath.getName(), ipaName.replace(".ipa", ""));
         }
 
         return remotePath.replace(".app", "");
@@ -306,10 +324,12 @@ public class CodeSignWrapper extends Builder implements SimpleBuildStep {
             this.sign(launcher, listener, identifier, framework.getRemote());
         }
 
-        this.sign(launcher, listener, identifier,  projectRoot.child("entitlements.plist").getRemote(), binaryPath.getRemote());
+        String entitlementsPath = projectRoot.child(ENTITLEMENTS_PLIST_PATH).getRemote();
+        this.sign(launcher, listener, identifier, entitlementsPath , binaryPath.getRemote());
 
         if (this.shouldVerify) {
             this.checkSignature(launcher, listener, binaryPath.getRemote());
+            this.showAppInfo(launcher, listener, this.binaryPath.getRemote());
         }
 
         this.createIpa(launcher, listener, this.getIpaName());

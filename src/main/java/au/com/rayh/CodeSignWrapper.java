@@ -13,6 +13,7 @@ import hudson.tasks.Builder;
 import hudson.util.ArgumentListBuilder;
 import jenkins.tasks.SimpleBuildStep;
 
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.regex.Matcher;
@@ -32,6 +33,7 @@ public class CodeSignWrapper extends Builder implements SimpleBuildStep {
     private boolean shouldClean;
     private boolean shouldVerify;
     private String ipaName;
+    private  LauncherUtility runner = new LauncherUtility();
 
     CodeSignWrapper(String appPath, String keychainName, FilePath resourcesPath, boolean shouldClean, boolean shouldVerify, String ipaName) {
         this.appPath = appPath;
@@ -131,30 +133,20 @@ public class CodeSignWrapper extends Builder implements SimpleBuildStep {
 
     @SuppressFBWarnings("DM_DEFAULT_ENCODING")
     public void setEntitlements(Launcher launcher, FilePath projectRoot) throws  IOException, InterruptedException {
-        ByteArrayOutputStream plistStdout = new ByteArrayOutputStream();
-        ByteArrayOutputStream plistSdterr = new ByteArrayOutputStream();
-        ByteArrayOutputStream entitlementsStdout = new ByteArrayOutputStream();
+        String binaryPath = this.binaryPath.child(PROFILE_FILE).getRemote();
+        FilePath plistPath = projectRoot.child("temp.plist");
+        FilePath entitlementsPath = projectRoot.child(ENTITLEMENTS_PLIST_PATH);
 
-        launcher
-                .launch()
-                .cmds("security", "cms", "-k", this.keychainName, "-D", "-i", binaryPath.child(PROFILE_FILE).getRemote())
-                .stderr(plistSdterr)
-                .stdout(plistStdout)
-                .join();
-        projectRoot.child("temp.plist").write(plistStdout.toString(), "utf-8");
+        ArgumentListBuilder args = new ArgumentListBuilder("security", "cms", "-k", this.keychainName, "-D", "-i", binaryPath);
+        LauncherUtility.LauncherResponse plistRes = runner.run(args, false);
+        projectRoot.child("temp.plist").write(plistRes.getStdout().toString(), "utf-8");
 
-        launcher
-                .launch()
-                .cmds("/usr/libexec/PlistBuddy", "-x", "-c", "Print :Entitlements", projectRoot.child("temp.plist").getRemote())
-                .stdout(entitlementsStdout)
-                .join();
-        projectRoot.child(ENTITLEMENTS_PLIST_PATH).write(entitlementsStdout.toString(), "utf-8");
+        ArgumentListBuilder args2 = new ArgumentListBuilder("/usr/libexec/PlistBuddy", "-x", "-c", "Print :Entitlements", plistPath.getRemote());
+        LauncherUtility.LauncherResponse entitlementsRes = runner.run(args2, false);
+        entitlementsPath.write(entitlementsRes.getStdout().toString(), "utf-8");
     }
 
     public void sign(Launcher launcher, TaskListener listener, String config, String entitlements, String target) throws IOException, InterruptedException {
-        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
-        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
-
         ArgumentListBuilder args = new ArgumentListBuilder("codesign", "-v", "-f");
 
         args.add("-s").add(config);
@@ -165,18 +157,8 @@ public class CodeSignWrapper extends Builder implements SimpleBuildStep {
         }
 
         args.add(target);
-
-        launcher
-                .launch()
-                .cmds(args)
-                .stdout(stdout)
-                .stderr(stderr)
-                .join();
-        if (stderr.size() > 0) {
-            listener.getLogger().write(stderr.toByteArray());
-        } else {
-            listener.getLogger().write(stdout.toByteArray());
-        }
+        LauncherUtility.LauncherResponse res = runner.run(args, false);
+        listener.getLogger().write(res.getStdout().toByteArray());
     }
 
     public void sign(Launcher launcher, TaskListener listener, String config, String target) throws IOException, InterruptedException {
@@ -184,26 +166,18 @@ public class CodeSignWrapper extends Builder implements SimpleBuildStep {
     }
 
     public void showValidIdentities(Launcher launcher, TaskListener listener) throws IOException, InterruptedException {
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-
-        launcher
-                .launch()
-                .cmds("security", "find-identity", "-p", "codesigning", "-v", this.keychainName)
-                .stdout(out)
-                .join();
-        listener.getLogger().write(out.toByteArray());
+        ArgumentListBuilder args = new ArgumentListBuilder("security", "find-identity", "-p", "codesigning", "-v", this.keychainName);
+        LauncherUtility.LauncherResponse res = runner.run(args, false);
+        listener.getLogger().write(res.getStdout().toByteArray());
     }
 
     @SuppressFBWarnings("DM_DEFAULT_ENCODING")
     public String getIdentity(Launcher launcher) throws IOException, InterruptedException {
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        launcher
-                .launch()
-                .cmds("security", "find-identity", "-p", "codesigning", "-v", this.keychainName)
-                .stdout(out)
-                .join();
+        ArgumentListBuilder args = new ArgumentListBuilder("security", "find-identity", "-p", "codesigning",
+                "-v", this.keychainName);
+        LauncherUtility.LauncherResponse res = runner.run(args, false);
 
-        for (String part : out.toString().split("\\n")) {
+        for (String part : res.getStdout().toString().split("\\n")) {
             String re = "\\s+\\d\\)\\s+([a-zA-Z0-9]+)\\s+";
             Pattern pattern = Pattern.compile(re);
             Matcher matcher = pattern.matcher(part);
@@ -217,43 +191,19 @@ public class CodeSignWrapper extends Builder implements SimpleBuildStep {
     }
 
     public void checkSignature(Launcher launcher, TaskListener listener, String target) throws IOException, InterruptedException {
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        ByteArrayOutputStream err = new ByteArrayOutputStream();
-
-        launcher
-                .launch()
-                .cmds("codesign", "--verify", "--deep", "--strict", "--verbose=2", target)
-                .stdout(out)
-                .stderr(err)
-                .join();
-        if (err.size() > 0) {
-            listener.getLogger().write(err.toByteArray());
-        } else {
-            listener.getLogger().write(out.toByteArray());
-        }
+        ArgumentListBuilder args = new ArgumentListBuilder("codesign", "--verify",
+                "--deep", "--strict", "--verbose=2", target);
+        LauncherUtility.LauncherResponse res = runner.run(args, false);
+        listener.getLogger().write(res.getStderr().toByteArray());
     }
 
     public void showAppInfo(Launcher launcher, TaskListener listener, String target) throws IOException, InterruptedException {
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        ByteArrayOutputStream err = new ByteArrayOutputStream();
-
-        launcher
-                .launch()
-                .cmds("codesign", "-vvvv", "-d", target)
-                .stdout(out)
-                .stderr(err)
-                .join();
-        if (err.size() > 0) {
-            listener.getLogger().write(err.toByteArray());
-        } else {
-            listener.getLogger().write(out.toByteArray());
-        }
+        ArgumentListBuilder args = new ArgumentListBuilder("codesign", "-vvvv", "-d", target);
+        LauncherUtility.LauncherResponse res = runner.run(args, false);
+        listener.getLogger().write(res.getStderr().toByteArray());
     }
 
     public void createIpa(Launcher launcher, TaskListener listener, String dest) throws IOException, InterruptedException {
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        ByteArrayOutputStream err = new ByteArrayOutputStream();
-
         FilePath payloadFolder = this.binaryPath.getParent().child("Payload");
         FilePath appFolder = payloadFolder.child(this.binaryPath.getName());
 
@@ -265,18 +215,11 @@ public class CodeSignWrapper extends Builder implements SimpleBuildStep {
         appFolder.mkdirs();
         this.binaryPath.copyRecursiveTo(appFolder);
 
-        launcher
-                .launch()
-                .pwd(this.binaryPath.getParent())
-                .cmds("zip", "-r", dest + ".ipa", payloadFolder.getName())
-                .stdout(out)
-                .stderr(err)
-                .join();
-        if (err.size() > 0) {
-            listener.getLogger().write(err.toByteArray());
-        } else {
-            listener.getLogger().write(out.toByteArray());
-        }
+        ArgumentListBuilder args = new ArgumentListBuilder("zip", "-r", dest + ".ipa", payloadFolder.getName());
+        this.runner.setPwd(this.binaryPath.getParent());
+        LauncherUtility.LauncherResponse res = runner.run(args, false);
+        listener.getLogger().write(res.getStdout().toByteArray());
+        this.runner.setPwd(null);
     }
 
     public String getIpaName() {
@@ -308,6 +251,9 @@ public class CodeSignWrapper extends Builder implements SimpleBuildStep {
         if (this.shouldClean) {
             this.clean();
         }
+
+        this.runner.bootstrap(launcher, listener);
+        this.runner.setEnv(envs);
 
         this.setEmbeddedProfile();
         this.setEntitlements(launcher, projectRoot);

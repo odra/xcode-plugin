@@ -1,0 +1,18 @@
+<?jelly escape-by-default='true'?>
+<j:jelly  xmlns:j="jelly:core" xmlns:f="/lib/form">
+    <f:entry field="profileId" title="DeveloperProfileId">
+        <f:textbox />
+    </f:entry>
+    <f:entry field="ipaName" title="Resulting IPA name to use">
+        <f:textbox />
+    </f:entry>
+    <f:entry field="appPath" title="Path where .app file is stored">
+        <f:textbox />
+    </f:entry>
+    <f:entry field="clean" title="Should clean before codesign">
+        <f:checkbox default="true" />
+    </f:entry>
+    <f:entry field="verify" title="Verify artifact signature">
+        <f:checkbox default="true" />
+    </f:entry>
+</j:jelly>

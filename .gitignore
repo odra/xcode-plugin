@@ -6,3 +6,4 @@ test-*
 .DS_Store
 *.orig
 TEST-*.xml
+Makefile

@@ -51,10 +51,30 @@ public class CodeSignStep extends AbstractStepImpl {
         this.appPath = value;
     }
 
+    public String getProfileId() {
+        return profileId;
+    }
+
+    public boolean isClean() {
+        return clean;
+    }
+
+    public boolean isVerify() {
+        return verify;
+    }
+
+    public String getIpaName() {
+        return ipaName;
+    }
+
+    public String getAppPath() {
+        return appPath;
+    }
+
     @DataBoundConstructor
     public CodeSignStep() {}
 
-    private static class CodeSigntepExecution extends AbstractSynchronousNonBlockingStepExecution<Void> {
+    private static class CodeSignStepExecution extends AbstractSynchronousNonBlockingStepExecution<Void> {
         private static final long serialVersionUID = 1L;
 
         @Inject
@@ -113,7 +133,7 @@ public class CodeSignStep extends AbstractStepImpl {
         private static String FN_NAME = "codeSign";
 
         public DescriptorImpl() {
-            super(CodeSignStep.CodeSigntepExecution.class);
+            super(CodeSignStep.CodeSignStepExecution.class);
         }
 
         @Override

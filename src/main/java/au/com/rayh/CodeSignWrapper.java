@@ -14,7 +14,6 @@ import hudson.util.ArgumentListBuilder;
 import jenkins.tasks.SimpleBuildStep;
 
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -240,7 +239,7 @@ public class CodeSignWrapper extends Builder implements SimpleBuildStep {
             return false;
         }
 
-        FilePath binaryPath = projectRoot.child(path);
+        FilePath binaryPath = projectRoot.child(path.replace(" ", "\\ "));
 
         if (!binaryPath.exists()) {
             throw new AbortException("Could not find binary at path: " + path);

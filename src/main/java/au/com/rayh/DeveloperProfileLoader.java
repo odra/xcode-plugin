@@ -50,6 +50,7 @@ public class DeveloperProfileLoader extends Builder implements SimpleBuildStep {
     private String keychainPassword;
     private String keychainName;
     private String provisioningpProfileName;
+    private boolean defaultKeychain;
 
     @DataBoundConstructor
     public DeveloperProfileLoader(String profileId) {
@@ -69,6 +70,30 @@ public class DeveloperProfileLoader extends Builder implements SimpleBuildStep {
     @Override
     public void perform(Run<?, ?> build, FilePath filePath, Launcher launcher, TaskListener taskListener) throws InterruptedException, IOException {
         _perform(build, filePath, launcher, taskListener);
+    }
+
+    public String getKeychainPassword() {
+        return keychainPassword;
+    }
+
+    public void setKeychainPassword(String keychainPassword) {
+        this.keychainPassword = keychainPassword;
+    }
+
+    public String getKeychainName() {
+        return keychainName;
+    }
+
+    public boolean isDefaultKeychain() {
+        return defaultKeychain;
+    }
+
+    public void setDefaultKeychain(boolean defaultKeychain) {
+        this.defaultKeychain = defaultKeychain;
+    }
+
+    public void setKeychainName(String keychainName) {
+        this.keychainName = keychainName;
     }
 
     private DeveloperProfile buildProfile(Run<?, ?> build, boolean hasContext) {
@@ -122,6 +147,13 @@ public class DeveloperProfileLoader extends Builder implements SimpleBuildStep {
         args.add("-p").addMasked(keychainPass);
         args.add(keyChain);
         invoke(launcher, listener, args, "Failed to unlock keychain");
+
+        if (this.defaultKeychain) {
+            args = new ArgumentListBuilder("security", "default-keychain");
+            args.add("-d").add("user");
+            args.add(keyChain);
+            invoke(launcher, listener, args, "Failed to set default keychain");
+        }
 
         final FilePath secret = getSecretDir(filePath, keychainPass);
 

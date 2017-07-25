@@ -1,19 +1,15 @@
 package au.com.rayh;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
-import hudson.AbortException;
-import hudson.EnvVars;
-import hudson.FilePath;
-import hudson.Launcher;
-import hudson.model.AbstractBuild;
-import hudson.model.BuildListener;
-import hudson.model.Run;
-import hudson.model.TaskListener;
+import hudson.*;
+import hudson.model.*;
+import hudson.tasks.BuildStepDescriptor;
 import hudson.tasks.Builder;
 import hudson.util.ArgumentListBuilder;
 import jenkins.tasks.SimpleBuildStep;
 
 
+import javax.inject.Inject;
 import java.io.IOException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -280,5 +276,47 @@ public class CodeSignWrapper extends Builder implements SimpleBuildStep {
         this.createIpa(launcher, listener, this.getIpaName());
 
         return true;
+    }
+
+    public GlobalConfigurationImpl getGlobalConfiguration() {
+        return getDescriptor().getGlobalConfiguration();
+    }
+
+    @Override
+    public CodeSignWrapper.DescriptorImpl getDescriptor() {
+        return (CodeSignWrapper.DescriptorImpl) super.getDescriptor();
+    }
+
+    @Extension
+    public static final class DescriptorImpl extends BuildStepDescriptor<Builder> {
+        GlobalConfigurationImpl globalConfiguration;
+
+        @Override
+        public String getDisplayName() {
+            return "CodeSign";
+        }
+
+        protected DescriptorImpl(Class<? extends Builder> clazz) {
+            super(clazz);
+        }
+
+        public DescriptorImpl() {
+            load();
+        }
+
+        @SuppressFBWarnings("UWF_UNWRITTEN_FIELD")
+        @Inject
+        void setGlobalConfiguration(GlobalConfigurationImpl c) {
+            this.globalConfiguration = c;
+        }
+
+        public GlobalConfigurationImpl getGlobalConfiguration() {
+            return globalConfiguration;
+        }
+
+        @Override
+        public boolean isApplicable(Class<? extends AbstractProject> aClass) {
+            return true;
+        }
     }
 }

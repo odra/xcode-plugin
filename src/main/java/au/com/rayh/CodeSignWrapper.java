@@ -184,12 +184,16 @@ public class CodeSignWrapper extends Builder implements SimpleBuildStep {
 
         return null;
     }
-
+    @SuppressFBWarnings("DM_DEFAULT_ENCODING")
     public void checkSignature(Launcher launcher, TaskListener listener, String target) throws IOException, InterruptedException {
         ArgumentListBuilder args = new ArgumentListBuilder("codesign", "--verify",
                 "--deep", "--strict", "--verbose=2", target);
         LauncherUtility.LauncherResponse res = runner.run(args, false);
         listener.getLogger().write(res.getStderr().toByteArray());
+        CodeSignOutputParser parser = new CodeSignOutputParser();
+        if (!parser.isValidOutput(res.getStderr().toString())) {
+            throw new AbortException("Codesign signature failed.");
+        }
     }
 
     public void showAppInfo(Launcher launcher, TaskListener listener, String target) throws IOException, InterruptedException {

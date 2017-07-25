@@ -11,7 +11,6 @@ public class CodeSignOutputParser {
     }
 
     public boolean isValidOutput(String output) {
-
         Matcher m = SIGN_PATTERN.matcher(output);
         int count = 0;
 

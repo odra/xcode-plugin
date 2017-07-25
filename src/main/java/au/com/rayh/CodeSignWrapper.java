@@ -7,6 +7,7 @@ import hudson.tasks.BuildStepDescriptor;
 import hudson.tasks.Builder;
 import hudson.util.ArgumentListBuilder;
 import jenkins.tasks.SimpleBuildStep;
+import org.omg.Messaging.SYNC_WITH_TRANSPORT;
 
 
 import javax.inject.Inject;
@@ -29,6 +30,7 @@ public class CodeSignWrapper extends Builder implements SimpleBuildStep {
     private boolean shouldVerify;
     private String ipaName;
     private  LauncherUtility runner = new LauncherUtility();
+    public boolean result;
 
     CodeSignWrapper(String appPath, String keychainName, FilePath resourcesPath, boolean shouldClean, boolean shouldVerify, String ipaName) {
         this.appPath = appPath;
@@ -41,13 +43,13 @@ public class CodeSignWrapper extends Builder implements SimpleBuildStep {
 
     @Override
     public void perform(Run<?, ?> build, FilePath filePath, Launcher launcher, TaskListener listener) throws InterruptedException, IOException {
-        _perform(build, filePath, launcher, build.getEnvironment(listener), listener);
+        this.result = _perform(build, filePath, launcher, build.getEnvironment(listener), listener);
     }
 
     @Override
     public boolean perform(AbstractBuild build, Launcher launcher, BuildListener listener) throws InterruptedException, IOException {
         boolean res = _perform(build, build.getWorkspace(), launcher, build.getEnvironment(listener), listener);
-
+        this.result = res;
         return  res;
     }
 
@@ -60,11 +62,14 @@ public class CodeSignWrapper extends Builder implements SimpleBuildStep {
     }
 
     public void cleanAppSignature() throws IOException, InterruptedException {
-        this.binaryPath.child(SIGNATURE_FILE).delete();
+        this.binaryPath.child(SIGNATURE_FILE).deleteRecursive();
     }
 
-    public boolean hasCodeSignedFrameworks() {
+    public boolean hasCodeSignedFrameworks() throws IOException, InterruptedException {
         FilePath frameworkFolder = this.binaryPath.child("Frameworks");
+        if (!frameworkFolder.exists()) {
+            return false;
+        }
         try {
             for (FilePath framework : frameworkFolder.list()) {
                 if (framework.child(SIGNATURE_FILE).exists()) {
@@ -80,10 +85,13 @@ public class CodeSignWrapper extends Builder implements SimpleBuildStep {
 
     public void cleanFrameworksSignature() throws IOException, InterruptedException {
         FilePath frameworkFolder = this.binaryPath.child("Frameworks");
+        if (!frameworkFolder.exists()) {
+            return;
+        }
         for (FilePath framework : frameworkFolder.list()) {
             FilePath frameworkSignature = framework.child(SIGNATURE_FILE);
             if (frameworkSignature.exists()) {
-                frameworkSignature.delete();
+                frameworkSignature.deleteRecursive();
             }
         }
     }
@@ -114,16 +122,18 @@ public class CodeSignWrapper extends Builder implements SimpleBuildStep {
         }
     }
 
-    public void setEmbeddedProfile() throws IOException, InterruptedException {
+    public boolean setEmbeddedProfile() throws IOException, InterruptedException {
         FilePath[] folders = this.resourcesPath.list("**/*.mobileprovision");
 
         if (folders.length == 0) {
-            throw  new AbortException("Provisioning profile not found");
+            return false;
         }
 
         FilePath profilePath = folders[0];
 
         profilePath.copyTo(binaryPath.child(PROFILE_FILE));
+
+        return true;
     }
 
     @SuppressFBWarnings("DM_DEFAULT_ENCODING")
@@ -185,15 +195,19 @@ public class CodeSignWrapper extends Builder implements SimpleBuildStep {
         return null;
     }
     @SuppressFBWarnings("DM_DEFAULT_ENCODING")
-    public void checkSignature(Launcher launcher, TaskListener listener, String target) throws IOException, InterruptedException {
+    public boolean checkSignature(Launcher launcher, TaskListener listener, String target) throws IOException, InterruptedException {
         ArgumentListBuilder args = new ArgumentListBuilder("codesign", "--verify",
                 "--deep", "--strict", "--verbose=2", target);
         LauncherUtility.LauncherResponse res = runner.run(args, false);
         listener.getLogger().write(res.getStderr().toByteArray());
         CodeSignOutputParser parser = new CodeSignOutputParser();
+
         if (!parser.isValidOutput(res.getStderr().toString())) {
-            throw new AbortException("Codesign signature failed.");
+            listener.getLogger().println("Codesign signature failed.");
+            return false;
         }
+
+        return true;
     }
 
     public void showAppInfo(Launcher launcher, TaskListener listener, String target) throws IOException, InterruptedException {
@@ -239,10 +253,11 @@ public class CodeSignWrapper extends Builder implements SimpleBuildStep {
             return false;
         }
 
-        FilePath binaryPath = projectRoot.child(path.replace(" ", "\\ "));
+        FilePath binaryPath = projectRoot.child(path);
 
         if (!binaryPath.exists()) {
-            throw new AbortException("Could not find binary at path: " + path);
+            listener.getLogger().println("Could not find binary at path: " + binaryPath);
+            return false;
         }
 
         this.binaryPath = binaryPath;
@@ -254,20 +269,27 @@ public class CodeSignWrapper extends Builder implements SimpleBuildStep {
         this.runner.bootstrap(launcher, listener);
         this.runner.setEnv(envs);
 
-        this.setEmbeddedProfile();
+        if (!this.setEmbeddedProfile()) {
+            listener.getLogger().println("Provisioning profile not found");
+            return false;
+        }
         this.setEntitlements(launcher, projectRoot);
         this.showValidIdentities(launcher, listener);
 
         String identifier = this.getIdentity(launcher);
 
         if (identifier == null) {
-            throw new AbortException("Could not retrieve a valid codesign identity.");
+            listener.getLogger().println("Could not retrieve a valid codesign identity.");
+            return false;
         }
 
         FilePath frameworkFolder = this.binaryPath.child("Frameworks");
-        for (FilePath framework : frameworkFolder.list()) {
-            this.sign(launcher, listener, identifier, framework.getRemote());
+        if (frameworkFolder.exists()) {
+            for (FilePath framework : frameworkFolder.list()) {
+                this.sign(launcher, listener, identifier, framework.getRemote());
+            }
         }
+
 
         String entitlementsPath = projectRoot.child(ENTITLEMENTS_PLIST_PATH).getRemote();
         this.sign(launcher, listener, identifier, entitlementsPath , binaryPath.getRemote());

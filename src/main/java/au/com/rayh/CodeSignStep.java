@@ -1,10 +1,7 @@
 package au.com.rayh;
 
 import com.google.inject.Inject;
-import hudson.EnvVars;
-import hudson.Extension;
-import hudson.FilePath;
-import hudson.Launcher;
+import hudson.*;
 import hudson.model.Run;
 import hudson.model.TaskListener;
 import org.jenkinsci.plugins.workflow.steps.AbstractStepDescriptorImpl;
@@ -122,6 +119,10 @@ public class CodeSignStep extends AbstractStepImpl {
             codesign.perform(build, workspace, launcher, listener);
 
             profileLoader.unload(workspace, launcher, listener);
+
+            if (!codesign.result) {
+                throw  new AbortException("Error while running the build job.");
+            }
 
             return null;
         }

@@ -4,7 +4,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class CodeSignOutputParser {
-    private static Pattern SIGN_PATTERN = Pattern.compile("^[a-zA-Z0-9\\-._/]+: (valid on disk|satisfies its Designated Requirement)$", Pattern.MULTILINE);
+    private static Pattern SIGN_PATTERN = Pattern.compile("^[a-zA-Z0-9\\-._/\\s]+: (valid on disk|satisfies its Designated Requirement)$", Pattern.MULTILINE);
 
     public CodeSignOutputParser() {
         super();

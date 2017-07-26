@@ -907,7 +907,6 @@ public class XCodeBuilder extends Builder implements SimpleBuildStep {
     public Team getDevelopmentTeam() {
         if(!StringUtils.isEmpty(developmentTeamName)) {
             for (Team team : getGlobalConfiguration().getTeams()) {
-                System.out.println(team.getTeamID() + ":" + team.getTeamName());
                 if(team.getTeamName().equals(developmentTeamName))
                     return team;
             }

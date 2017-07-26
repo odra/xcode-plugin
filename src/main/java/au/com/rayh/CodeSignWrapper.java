@@ -290,14 +290,16 @@ public class CodeSignWrapper extends Builder implements SimpleBuildStep {
             }
         }
 
-
         String entitlementsPath = projectRoot.child(ENTITLEMENTS_PLIST_PATH).getRemote();
         this.sign(launcher, listener, identifier, entitlementsPath , binaryPath.getRemote());
 
         if (this.shouldVerify) {
-            this.checkSignature(launcher, listener, binaryPath.getRemote());
-            this.showAppInfo(launcher, listener, this.binaryPath.getRemote());
+            if (!this.checkSignature(launcher, listener, binaryPath.getRemote())) {
+                return false;
+            }
         }
+
+        this.showAppInfo(launcher, listener, this.binaryPath.getRemote());
 
         this.createIpa(launcher, listener, this.getIpaName());
 

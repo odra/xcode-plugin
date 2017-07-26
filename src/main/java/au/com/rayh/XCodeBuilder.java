@@ -59,6 +59,8 @@ import java.util.UUID;
 import java.util.Collection;
 import java.util.concurrent.TimeUnit;
 
+import org.jenkinsci.Symbol;
+
 /**
  * @author Ray Hilton
  */
@@ -204,6 +206,12 @@ public class XCodeBuilder extends Builder implements SimpleBuildStep {
      */
     public final String ipaManifestPlistUrl;
 
+    public boolean shouldCodeSign;
+
+    private String flags;
+
+    private EnvVars env;
+    
     // Fields in config.jelly must match the parameter names in the "DataBoundConstructor"
     @DataBoundConstructor
     public XCodeBuilder(Boolean buildIpa, Boolean generateArchive, Boolean cleanBeforeBuild, Boolean cleanTestReports, String configuration,
@@ -246,6 +254,7 @@ public class XCodeBuilder extends Builder implements SimpleBuildStep {
         this.interpretTargetAsRegEx = interpretTargetAsRegEx;
         this.ipaManifestPlistUrl = ipaManifestPlistUrl;
         this.ipaExportMethod = ipaExportMethod;
+        this.shouldCodeSign = true;
     }
 
     @Deprecated
@@ -266,6 +275,14 @@ public class XCodeBuilder extends Builder implements SimpleBuildStep {
                 bundleIDInfoPlistPath, ipaManifestPlistUrl, interpretTargetAsRegEx, "ad-hoc");
     }
 
+    public void setFlags(String flags) {
+        this.flags = flags;
+    }
+
+    public void setEnv(EnvVars env) {
+        this.env = env;
+    }
+
     @SuppressWarnings("unused")
     private Object readResolve() throws ObjectStreamException {
         if (provideApplicationVersion == null) {
@@ -279,17 +296,18 @@ public class XCodeBuilder extends Builder implements SimpleBuildStep {
 
     @Override
     public void perform(Run<?, ?> build, FilePath filePath, Launcher launcher, TaskListener listener) throws InterruptedException, IOException {
-		_perform(build, filePath, launcher, build.getEnvironment(listener), listener);
+		EnvVars env = this.env != null ? this.env :  build.getEnvironment(listener);
+        _perform(build, filePath, launcher, env, listener);
     }
 
     @Override
     public boolean perform(AbstractBuild build, Launcher launcher, BuildListener listener) throws InterruptedException, IOException {
-		return _perform(build, build.getWorkspace(), launcher, build.getEnvironment(listener), listener);
+        EnvVars env = this.env != null ? this.env :  build.getEnvironment(listener);
+        return _perform(build, build.getWorkspace(), launcher, env, listener);
 	}
 
     @SuppressFBWarnings("DM_DEFAULT_ENCODING")
     private boolean _perform(Run<?,?> build, FilePath projectRoot, Launcher launcher, EnvVars envs, TaskListener listener) throws InterruptedException, IOException {
-
         // check that the configured tools exist
         if (!new FilePath(projectRoot.getChannel(), getGlobalConfiguration().getXcodebuildPath()).exists()) {
             listener.fatalError(Messages.XCodeBuilder_xcodebuildNotFound(getGlobalConfiguration().getXcodebuildPath()));
@@ -478,7 +496,7 @@ public class XCodeBuilder extends Builder implements SimpleBuildStep {
             projectRoot.child("test-reports").deleteRecursive();
 		}
 
-        if (unlockKeychain != null && unlockKeychain) {
+        if (unlockKeychain != null && unlockKeychain && shouldCodeSign) {
             // Let's unlock the keychain
             Keychain keychain = getKeychain();
             if(keychain == null)
@@ -486,6 +504,7 @@ public class XCodeBuilder extends Builder implements SimpleBuildStep {
                 listener.fatalError(Messages.XCodeBuilder_keychainNotConfigured());
                 return false;
             }
+
             String keychainPath = envs.expand(keychain.getKeychainPath());
             String keychainPwd = envs.expand(keychain.getKeychainPassword());
             launcher.launch().envs(envs).cmds("/usr/bin/security", "list-keychains", "-s", keychainPath).stdout(listener).pwd(projectRoot).join();
@@ -504,22 +523,26 @@ public class XCodeBuilder extends Builder implements SimpleBuildStep {
             launcher.launch().envs(envs).cmds("/usr/bin/security", "show-keychain-info", keychainPath).stdout(listener).pwd(projectRoot).join();
         }
 
-        // display useful setup information
-        listener.getLogger().println(Messages.XCodeBuilder_DebugInfoLineDelimiter());
-        listener.getLogger().println(Messages.XCodeBuilder_DebugInfoAvailablePProfiles());
-        /*returnCode =*/ launcher.launch().envs(envs).cmds("/usr/bin/security", "find-identity", "-p", "codesigning", "-v").stdout(listener).pwd(projectRoot).join();
+        if (this.shouldCodeSign) {
 
-        Team team = getDevelopmentTeam();
-        if(team == null)
-        {
-            listener.fatalError(Messages.XCodeBuilder_teamNotConfigured());
-            return false;
-        }
-        String developmentTeamID = envs.expand(team.getTeamID());
-        if (!StringUtils.isEmpty(developmentTeamID)) {
-            listener.getLogger().println(Messages.XCodeBuilder_DebugInfoCanFindPProfile());
-            /*returnCode =*/ launcher.launch().envs(envs).cmds("/usr/bin/security", "find-certificate", "-a", "-c", developmentTeamID, "-Z", "|", "grep", "^SHA-1").stdout(listener).pwd(projectRoot).join();
-            // We could fail here, but this doesn't seem to work as it should right now (output not properly redirected. We might need a parser)
+            // display useful setup information
+            listener.getLogger().println(Messages.XCodeBuilder_DebugInfoLineDelimiter());
+            listener.getLogger().println(Messages.XCodeBuilder_DebugInfoAvailablePProfiles());
+        /*returnCode =*/
+            launcher.launch().envs(envs).cmds("/usr/bin/security", "find-identity", "-p", "codesigning", "-v").stdout(listener).pwd(projectRoot).join();
+
+            Team team = getDevelopmentTeam();
+            if (team == null) {
+                listener.fatalError(Messages.XCodeBuilder_teamNotConfigured());
+                return false;
+            }
+            String developmentTeamID = envs.expand(team.getTeamID());
+            if (!StringUtils.isEmpty(developmentTeamID)) {
+                listener.getLogger().println(Messages.XCodeBuilder_DebugInfoCanFindPProfile());
+            /*returnCode =*/
+                launcher.launch().envs(envs).cmds("/usr/bin/security", "find-certificate", "-a", "-c", developmentTeamName, "-Z", "|", "grep", "^SHA-1").stdout(listener).pwd(projectRoot).join();
+                // We could fail here, but this doesn't seem to work as it should right now (output not properly redirected. We might need a parser)
+            }
         }
 
         listener.getLogger().println(Messages.XCodeBuilder_DebugInfoAvailableSDKs());
@@ -625,7 +648,7 @@ public class XCodeBuilder extends Builder implements SimpleBuildStep {
         //Generating an archive builds the project twice
         //commandLine.add("build");
         FilePath archiveLocation = buildDirectory.absolutize().child(xcodeSchema + ".xcarchive");
-        if(buildIpa || generateArchive){
+        if((buildIpa || generateArchive) && shouldCodeSign){
             commandLine.add("archive");
             commandLine.add("-archivePath");
             commandLine.add(archiveLocation.getRemote());
@@ -645,14 +668,15 @@ public class XCodeBuilder extends Builder implements SimpleBuildStep {
 
         // BUILD_DIR
         if (!StringUtils.isEmpty(buildDirValue)) {
-            commandLine.add("BUILD_DIR=" + buildDirValue);
-            xcodeReport.append(", buildDir: ").append(buildDirValue);
+            String fullBuildDir = projectRoot.child(buildDirValue).getRemote();
+            commandLine.add("BUILD_DIR=" + fullBuildDir);
+            xcodeReport.append(", buildDir: ").append(fullBuildDir);
         } else {
             xcodeReport.append(", buildDir: DEFAULT");
         }
 
         // handle code signing identities
-        if (!StringUtils.isEmpty(developmentTeamID)) {
+        if (!StringUtils.isEmpty(developmentTeamID) && shouldCodeSign) {
             commandLine.add("DEVELOPMENT_TEAM=" + developmentTeamID);
             xcodeReport.append(", developmentTeamID: ").append(developmentTeamID);
         } else {
@@ -664,6 +688,17 @@ public class XCodeBuilder extends Builder implements SimpleBuildStep {
             commandLine.addAll(splitXcodeBuildArguments(xcodebuildArguments));
         }
 
+        //does not use xcode auto codesign
+        if (!shouldCodeSign) {
+            commandLine.add("CODE_SIGN_IDENTITY=");
+            commandLine.add("CODE_SIGNING_REQUIRED=NO");
+            commandLine.add("DEVELOPMENT_TEAM=" + developmentTeamID);
+        }
+
+        if (this.flags != null) {
+            commandLine.add(this.flags);
+        }
+
         listener.getLogger().println(xcodeReport.toString());
         returnCode = launcher.launch().envs(envs).cmds(commandLine).stdout(reportGenerator.getOutputStream()).pwd(projectRoot).join();
         if (allowFailingBuildResults != null && !allowFailingBuildResults) {
@@ -672,7 +707,7 @@ public class XCodeBuilder extends Builder implements SimpleBuildStep {
         }
 
         // Package IPA
-        if (buildIpa) {
+        if (buildIpa && shouldCodeSign) {
 
             if (!buildDirectory.exists() || !buildDirectory.isDirectory()) {
                 listener.fatalError(Messages.XCodeBuilder_NotExistingBuildDirectory(buildDirectory.absolutize().getRemote()));

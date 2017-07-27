@@ -26,6 +26,7 @@ public class XcodeBuildStep extends AbstractStepImpl {
     private String teamId;
     private String teamName;
     private String exportMethod;
+    private String config = "Debug";
     private String src = "src";
     private String sdk = "iphoneos";
     private String outputDir = buildDir +  "/Release";
@@ -41,6 +42,15 @@ public class XcodeBuildStep extends AbstractStepImpl {
     private String keychainPassword;
     private String flags;
     private boolean autoSign;
+
+    public String getConfig() {
+        return config;
+    }
+
+    @DataBoundSetter
+    public void setConfig(String config) {
+        this.config = config;
+    }
 
     @DataBoundSetter
     public void setCleanBuild(boolean value) {
@@ -186,7 +196,7 @@ public class XcodeBuildStep extends AbstractStepImpl {
             Boolean generateArchive = false;
             Boolean cleanBeforeBuild = step.cleanBuild;
             Boolean cleanTestReports = true;
-            String configuration = step.exportMethod;
+            String configuration = step.config;
             String target = null;
             String sdk = step.sdk;
             String xcodeProjectPath = step.src;

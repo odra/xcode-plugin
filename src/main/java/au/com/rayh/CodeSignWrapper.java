@@ -7,7 +7,6 @@ import hudson.tasks.BuildStepDescriptor;
 import hudson.tasks.Builder;
 import hudson.util.ArgumentListBuilder;
 import jenkins.tasks.SimpleBuildStep;
-import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.lang.StringUtils;
 
 
@@ -189,20 +188,14 @@ public class CodeSignWrapper extends Builder implements SimpleBuildStep {
         List<FilePath> fileList = path.absolutize().list(new DylibFileFilter());
 
         if (fileList == null || fileList.isEmpty()) {
-            listener.getLogger().println("No extra " + DylibFileFilter.EXTESION + " files found.");
+            runner.logMessage("No extra " + DylibFileFilter.EXTESION + " files found.");
             return;
         }
 
         for (FilePath filepath : fileList) {
-            listener
-                    .getLogger()
-                    .println("Found extra " + DylibFileFilter.EXTESION + " file: " + filepath.getName());
-
+            runner.logMessage("Found extra " + DylibFileFilter.EXTESION + " file: " + filepath.getName());
             filepath.delete();
-
-            listener
-                    .getLogger()
-                    .println(filepath.getName() + " removed before codesigning application.");
+            runner.logMessage(filepath.getName() + " removed before codesigning application.");
         }
     }
 
@@ -244,7 +237,7 @@ public class CodeSignWrapper extends Builder implements SimpleBuildStep {
         CodeSignOutputParser parser = new CodeSignOutputParser();
 
         if (!parser.isValidOutput(res.getStderr().toString())) {
-            listener.getLogger().println("Codesign signature failed.");
+            runner.logMessage("Codesign signature failed.");
             return false;
         }
 
@@ -263,12 +256,12 @@ public class CodeSignWrapper extends Builder implements SimpleBuildStep {
         String destFileName = StringUtils.substringAfterLast(dest, "/");
 
         if (payloadFolder.exists()) {
-            listener.getLogger().println("Removing previous Payload folder to generate a new one");
+            runner.logMessage("Removing previous Payload folder to generate a new one");
             payloadFolder.deleteRecursive();
         }
 
         if (this.binaryPath.exists()) {
-            listener.getLogger().println("Removing previous artifact to generate a new one: " + destFileName + ".ipa");
+            runner.logMessage("Removing previous artifact to generate a new one: " + destFileName + ".ipa");
             this.binaryPath.deleteRecursive();
         }
 
@@ -298,13 +291,14 @@ public class CodeSignWrapper extends Builder implements SimpleBuildStep {
         String path = this.appPath;
 
         if (path == null) {
+            runner.logMessage("Field appPath must not be NULL");
             return false;
         }
 
         FilePath binaryPath = projectRoot.child(path);
 
         if (!binaryPath.exists()) {
-            listener.getLogger().println("Could not find binary at path: " + binaryPath);
+            runner.logMessage("Could not find binary at path: " + binaryPath);
             return false;
         }
 
@@ -318,9 +312,10 @@ public class CodeSignWrapper extends Builder implements SimpleBuildStep {
         this.runner.setEnv(envs);
 
         if (!this.setEmbeddedProfile()) {
-            listener.getLogger().println("Provisioning profile not found");
+            runner.logMessage("Provisioning profile not found");
             return false;
         }
+
         this.setEntitlements(launcher, projectRoot);
         this.fixPlist(launcher, projectRoot);
         this.showValidIdentities(launcher, listener);
@@ -328,7 +323,7 @@ public class CodeSignWrapper extends Builder implements SimpleBuildStep {
         String identifier = this.getIdentity(launcher);
 
         if (identifier == null) {
-            listener.getLogger().println("Could not retrieve a valid codesign identity.");
+            runner.logMessage("Could not retrieve a valid codesign identity.");
             return false;
         }
 
@@ -346,6 +341,7 @@ public class CodeSignWrapper extends Builder implements SimpleBuildStep {
 
         if (this.shouldVerify) {
             if (!this.checkSignature(launcher, listener, binaryPath.getRemote())) {
+                runner.logMessage("Signature verification failed.");
                 return false;
             }
         }

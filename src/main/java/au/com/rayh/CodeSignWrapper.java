@@ -7,6 +7,8 @@ import hudson.tasks.BuildStepDescriptor;
 import hudson.tasks.Builder;
 import hudson.util.ArgumentListBuilder;
 import jenkins.tasks.SimpleBuildStep;
+import org.apache.commons.lang.StringEscapeUtils;
+import org.apache.commons.lang.StringUtils;
 
 
 import javax.inject.Inject;
@@ -258,9 +260,16 @@ public class CodeSignWrapper extends Builder implements SimpleBuildStep {
     public void createIpa(Launcher launcher, TaskListener listener, String dest) throws IOException, InterruptedException {
         FilePath payloadFolder = this.binaryPath.getParent().child("Payload");
         FilePath appFolder = payloadFolder.child(this.binaryPath.getName());
+        String destFileName = StringUtils.substringAfterLast(dest, "/");
 
         if (payloadFolder.exists()) {
+            listener.getLogger().println("Removing previous Payload folder to generate a new one");
             payloadFolder.deleteRecursive();
+        }
+
+        if (this.binaryPath.exists()) {
+            listener.getLogger().println("Removing previous artifact to generate a new one: " + destFileName + ".ipa");
+            this.binaryPath.deleteRecursive();
         }
 
         payloadFolder.mkdirs();

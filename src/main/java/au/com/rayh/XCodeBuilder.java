@@ -208,6 +208,8 @@ public class XCodeBuilder extends Builder implements SimpleBuildStep {
 
     public boolean shouldCodeSign;
 
+    public boolean jobStatus;
+
     private String flags;
 
     private EnvVars env;
@@ -297,13 +299,17 @@ public class XCodeBuilder extends Builder implements SimpleBuildStep {
     @Override
     public void perform(Run<?, ?> build, FilePath filePath, Launcher launcher, TaskListener listener) throws InterruptedException, IOException {
 		EnvVars env = this.env != null ? this.env :  build.getEnvironment(listener);
-        _perform(build, filePath, launcher, env, listener);
+        boolean res = _perform(build, filePath, launcher, env, listener);
+        jobStatus = res;
     }
 
     @Override
     public boolean perform(AbstractBuild build, Launcher launcher, BuildListener listener) throws InterruptedException, IOException {
         EnvVars env = this.env != null ? this.env :  build.getEnvironment(listener);
-        return _perform(build, build.getWorkspace(), launcher, env, listener);
+        boolean res = _perform(build, build.getWorkspace(), launcher, env, listener);
+        jobStatus = res;
+
+        return jobStatus;
 	}
 
     @SuppressFBWarnings("DM_DEFAULT_ENCODING")

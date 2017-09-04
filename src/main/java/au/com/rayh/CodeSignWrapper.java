@@ -253,16 +253,17 @@ public class CodeSignWrapper extends Builder implements SimpleBuildStep {
     public void createIpa(Launcher launcher, TaskListener listener, String dest) throws IOException, InterruptedException {
         FilePath payloadFolder = this.binaryPath.getParent().child("Payload");
         FilePath appFolder = payloadFolder.child(this.binaryPath.getName());
-        String destFileName = StringUtils.substringAfterLast(dest, "/");
+        String destFileName = StringUtils.substringAfterLast(dest, "/") + ".ipa";
+        FilePath ipaPath = binaryPath.getParent().child(destFileName);
 
         if (payloadFolder.exists()) {
             runner.logMessage("Removing previous Payload folder to generate a new one");
             payloadFolder.deleteRecursive();
         }
 
-        if (this.binaryPath.exists()) {
-            runner.logMessage("Removing previous artifact to generate a new one: " + destFileName + ".ipa");
-            this.binaryPath.deleteRecursive();
+        if (ipaPath.exists()) {
+            runner.logMessage("Removing previous artifact to generate a new one: " + destFileName);
+            ipaPath.deleteRecursive();
         }
 
         payloadFolder.mkdirs();

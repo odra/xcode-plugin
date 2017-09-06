@@ -2,6 +2,7 @@ package au.com.rayh;
 
 import com.google.inject.Inject;
 
+import hudson.*;
 import org.jenkinsci.plugins.workflow.steps.AbstractStepDescriptorImpl;
 import org.jenkinsci.plugins.workflow.steps.AbstractStepImpl;
 import org.jenkinsci.plugins.workflow.steps.AbstractSynchronousNonBlockingStepExecution;
@@ -12,10 +13,6 @@ import javax.annotation.Nonnull;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.DataBoundSetter;
 
-import hudson.EnvVars;
-import hudson.Extension;
-import hudson.FilePath;
-import hudson.Launcher;
 import hudson.model.Run;
 import hudson.model.TaskListener;
 
@@ -240,6 +237,10 @@ public class XcodeBuildStep extends AbstractStepImpl {
 
             builder.setEnv(env);
             builder.perform(build, workspace, launcher, listener);
+
+            if (!builder.jobStatus) {
+                throw new AbortException("Build aborted due to fatal errors.");
+            }
 
             return null;
         }

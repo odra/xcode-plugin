@@ -10,6 +10,7 @@ import hudson.util.ArgumentListBuilder;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.PrintStream;
 
 /**
  * Created by lrossett on 7/13/17.
@@ -60,6 +61,15 @@ public class LauncherUtility {
     public void bootstrap(Launcher launcher, TaskListener listener) {
         this.launcher = launcher;
         this.listener = listener;
+    }
+
+    public PrintStream getLogger() {
+        return listener.getLogger();
+    }
+
+    @SuppressFBWarnings("DM_DEFAULT_ENCODING")
+    public void logMessage(String message) {
+        getLogger().println("[Logger] " + message);
     }
 
     @SuppressFBWarnings("DM_DEFAULT_ENCODING")

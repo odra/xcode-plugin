@@ -58,6 +58,7 @@ public class DeveloperProfileLoader extends Builder implements SimpleBuildStep {
         this.id = profileId;
     }
 
+    @DataBoundSetter
     public void setProjectScope(boolean value) {
         this.isProjectScoped = value;
     }

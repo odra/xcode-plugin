@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.UUID;
 import hudson.model.Run;
 import hudson.model.TaskListener;
+import org.kohsuke.stapler.DataBoundSetter;
 
 import javax.annotation.Nonnull;
 
@@ -72,10 +73,12 @@ public class DeveloperProfileLoader extends Builder implements SimpleBuildStep {
         _perform(build, filePath, launcher, taskListener);
     }
 
+
     public String getKeychainPassword() {
         return keychainPassword;
     }
 
+    @DataBoundSetter
     public void setKeychainPassword(String keychainPassword) {
         this.keychainPassword = keychainPassword;
     }

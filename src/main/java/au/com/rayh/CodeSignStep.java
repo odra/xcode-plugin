@@ -106,7 +106,7 @@ public class CodeSignStep extends AbstractStepImpl {
             String buildName = build.getFullDisplayName();
             String keychainName = "jenkins-" + buildName.replace('/', '-');
 
-            DeveloperProfileLoader profileLoader = new DeveloperProfileLoader(profileId);
+            DeveloperProfileLoaderWrapper profileLoader = new DeveloperProfileLoaderWrapper(profileId);
             profileLoader.setProjectScope(false);
             profileLoader.perform(build, workspace, launcher, listener);
 

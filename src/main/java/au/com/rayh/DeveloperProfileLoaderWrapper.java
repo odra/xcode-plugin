@@ -45,7 +45,7 @@ import javax.annotation.Nonnull;
  * @author Kohsuke Kawaguchi
  */
 @SuppressFBWarnings("NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE")
-public class DeveloperProfileLoader extends Builder implements SimpleBuildStep {
+public class DeveloperProfileLoaderWrapper extends Builder implements SimpleBuildStep {
     private final String id;
     private boolean isProjectScoped;
     private String keychainPassword;
@@ -54,7 +54,7 @@ public class DeveloperProfileLoader extends Builder implements SimpleBuildStep {
     private boolean defaultKeychain;
 
     @DataBoundConstructor
-    public DeveloperProfileLoader(String profileId) {
+    public DeveloperProfileLoaderWrapper(String profileId) {
         this.id = profileId;
     }
 

@@ -121,9 +121,7 @@ public class DeveloperProfileLoaderWrapper extends Builder implements SimpleBuil
         if (dp==null)
             throw new AbortException("No Apple developer profile is configured");
 
-        // Note: keychain are usualy suffixed with .keychain. If we change we should probably clean up the ones we created
-        String keyChain = "jenkins-"+build.getFullDisplayName().replace('/', '-');
-        this.keychainName = keyChain;
+        generateKeychainName(build);
         String keychainPass;
 
         if (this.keychainPassword != null) {
@@ -138,24 +136,24 @@ public class DeveloperProfileLoaderWrapper extends Builder implements SimpleBuil
 
         {// if the key chain is already present, delete it and start fresh
             ByteArrayOutputStream out = new ByteArrayOutputStream();
-            args = new ArgumentListBuilder("security","delete-keychain", keyChain);
+            args = new ArgumentListBuilder("security","delete-keychain", this.keychainName);
             launcher.launch().cmds(args).stdout(out).join();
         }
 
         args = new ArgumentListBuilder("security","create-keychain");
         args.add("-p").addMasked(keychainPass);
-        args.add(keyChain);
+        args.add(this.keychainName);
         invoke(launcher, listener, args, "Failed to create a keychain");
 
         args = new ArgumentListBuilder("security","unlock-keychain");
         args.add("-p").addMasked(keychainPass);
-        args.add(keyChain);
+        args.add(this.keychainName);
         invoke(launcher, listener, args, "Failed to unlock keychain");
 
         if (this.defaultKeychain) {
             args = new ArgumentListBuilder("security", "default-keychain");
             args.add("-d").add("user");
-            args.add(keyChain);
+            args.add(this.keychainName);
             invoke(launcher, listener, args, "Failed to set default keychain");
         }
 
@@ -171,18 +169,18 @@ public class DeveloperProfileLoaderWrapper extends Builder implements SimpleBuil
         for (FilePath id : secret.list("**/*.p12")) {
 
             args = new ArgumentListBuilder("security","import");
-            args.add(id).add("-k",keyChain);
+            args.add(id).add("-k",this.keychainName);
             args.add("-P").addMasked(dp.getPassword().getPlainText());
             args.add("-T","/usr/bin/codesign");
             args.add("-T","/usr/bin/productsign");
-            args.add(keyChain);
+            args.add(this.keychainName);
             invoke(launcher, listener, args, "Failed to import identity "+id);
         }
 
         {
             // display keychain info for potential troubleshooting
             args = new ArgumentListBuilder("security","show-keychain-info");
-            args.add(keyChain);
+            args.add(this.keychainName);
             ByteArrayOutputStream output = invoke(launcher, listener, args, "Failed to show keychain info");
             listener.getLogger().write(output.toByteArray());
         }
@@ -258,7 +256,13 @@ public class DeveloperProfileLoaderWrapper extends Builder implements SimpleBuil
         return id;
     }
 
-    public void unload(FilePath filePath, Launcher launcher, TaskListener listener) throws InterruptedException, IOException {
+    public void generateKeychainName(@Nonnull Run<?, ?> build){
+        // Note: keychain are usualy suffixed with .keychain. If we change we should probably clean up the ones we created
+        this.keychainName = "jenkins-"+build.getFullDisplayName().replace('/', '-');
+    }
+
+    public void unload(@Nonnull Run<?, ?> build, FilePath filePath, Launcher launcher, TaskListener listener) throws InterruptedException, IOException {
+        generateKeychainName(build);
         ArgumentListBuilder args = new ArgumentListBuilder("security", "delete-keychain", this.keychainName);
         ByteArrayOutputStream output = invoke(launcher, listener, args, "Failed to remove keychain");
         listener.getLogger().write(output.toByteArray());

@@ -39,6 +39,10 @@ public class DeveloperProfileUnloaderStep extends AbstractStepImpl {
 
         @StepContextParameter
         @SuppressWarnings("unused")
+        private transient Run build;
+
+        @StepContextParameter
+        @SuppressWarnings("unused")
         private transient FilePath workspace;
 
         @StepContextParameter
@@ -57,7 +61,7 @@ public class DeveloperProfileUnloaderStep extends AbstractStepImpl {
             String profileId = dpls.profileId;
             DeveloperProfileLoaderWrapper profileLoader = new DeveloperProfileLoaderWrapper(profileId);
             profileLoader.setProjectScope(false);
-            profileLoader.unload(workspace, launcher, listener);
+            profileLoader.unload(build, workspace, launcher, listener);
 
 
             return null;

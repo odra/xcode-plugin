@@ -16,14 +16,14 @@ import org.kohsuke.stapler.DataBoundSetter;
 import javax.annotation.Nonnull;
 
 /**
- * Created by lfitzgerald on 03/11/17.
+ * Created by lfitzgerald on 07/11/17.
  */
-public class DeveloperProfileLoaderStep extends AbstractStepImpl{
+public class DeveloperProfileUnloaderStep extends AbstractStepImpl {
 
     private String profileId;
 
     @DataBoundConstructor
-    public DeveloperProfileLoaderStep() {}
+    public DeveloperProfileUnloaderStep() {}
 
 
     @DataBoundSetter
@@ -31,15 +31,11 @@ public class DeveloperProfileLoaderStep extends AbstractStepImpl{
         this.profileId = value;
     }
 
-    private static class DeveloperProfileLoaderExecution extends AbstractSynchronousNonBlockingStepExecution<Void>{
+    private static class DeveloperProfileUnloaderExecution extends AbstractSynchronousNonBlockingStepExecution<Void> {
         private static final long serialVersionUID = 1L;
 
         @Inject
-        private transient DeveloperProfileLoaderStep dpls;
-
-        @StepContextParameter
-        @SuppressWarnings("unused")
-        private transient Run build;
+        private transient DeveloperProfileUnloaderStep dpls;
 
         @StepContextParameter
         @SuppressWarnings("unused")
@@ -57,24 +53,25 @@ public class DeveloperProfileLoaderStep extends AbstractStepImpl{
         @Override
         protected Void run() throws Exception {
 
-            String profileId = dpls.profileId;
 
+            String profileId = dpls.profileId;
             DeveloperProfileLoaderWrapper profileLoader = new DeveloperProfileLoaderWrapper(profileId);
             profileLoader.setProjectScope(false);
-            profileLoader.perform(build, workspace, launcher, listener);
+            profileLoader.unload(workspace, launcher, listener);
 
-           return null;
+
+            return null;
         }
     }
 
 
     @Extension(optional = true)
     public static class DescriptorImpl extends AbstractStepDescriptorImpl {
-        private static String DISPLAY_NAME = "LoadDeveloperProfile";
-        private static String FN_NAME = "loadDeveloperProfile";
+        private static String DISPLAY_NAME = "UnloadDeveloperProfile";
+        private static String FN_NAME = "unloadDeveloperProfile";
 
         public DescriptorImpl() {
-            super(DeveloperProfileLoaderStep.DeveloperProfileLoaderExecution.class);
+            super(DeveloperProfileUnloaderStep.DeveloperProfileUnloaderExecution.class);
         }
 
         @Override

@@ -32,6 +32,7 @@ public class DeveloperProfileLoaderStep extends AbstractStepImpl{
     }
 
     private static class DeveloperProfileLoaderExecution extends AbstractSynchronousNonBlockingStepExecution<Void>{
+        private static final long serialVersionUID = 1L;
 
         @Inject
         private transient DeveloperProfileLoaderStep dpls;

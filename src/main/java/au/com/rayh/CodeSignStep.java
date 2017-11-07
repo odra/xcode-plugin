@@ -118,7 +118,7 @@ public class CodeSignStep extends AbstractStepImpl {
                     ipaName);
             codesign.perform(build, workspace, launcher, listener);
 
-            profileLoader.unload(workspace, launcher, listener);
+            profileLoader.unload(build, workspace, launcher, listener);
 
             if (!codesign.result) {
                 throw  new AbortException("Error while running the build job.");

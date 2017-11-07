@@ -56,14 +56,10 @@ public class DeveloperProfileUnloaderStep extends AbstractStepImpl {
 
         @Override
         protected Void run() throws Exception {
-
-
             String profileId = dpls.profileId;
             DeveloperProfileLoaderWrapper profileLoader = new DeveloperProfileLoaderWrapper(profileId);
             profileLoader.setProjectScope(false);
             profileLoader.unload(build, workspace, launcher, listener);
-
-
             return null;
         }
     }

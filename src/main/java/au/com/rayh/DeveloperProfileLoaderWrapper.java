@@ -148,7 +148,7 @@ public class DeveloperProfileLoaderWrapper extends Builder implements SimpleBuil
             invoke(launcher, listener, args, "Failed to set default keychain");
         }
 
-        final FilePath secret = getSecretDir(filePath, this.keychainPassword);
+        final FilePath secret = getSecretDir(filePath, build);
 
         try {
             secret.unzipFrom(new ByteArrayInputStream(dp.getImage()));
@@ -205,6 +205,10 @@ public class DeveloperProfileLoaderWrapper extends Builder implements SimpleBuil
         return this.getSecretDir(path, this.keychainPassword);
     }
 
+    public FilePath getSecretDir(FilePath path, Run<?, ?> build) throws IOException, InterruptedException {
+        return this.getSecretDir(path, this.getProfileFolder(build));
+    }
+
     public DeveloperProfile getProfile() {
         List<DeveloperProfile> profiles = CredentialsProvider
                 .lookupCredentials(DeveloperProfile.class, Jenkins.getAuthentication());
@@ -235,7 +239,13 @@ public class DeveloperProfileLoaderWrapper extends Builder implements SimpleBuil
 
     public void generateKeychainName(Run<?, ?> build){
         // Note: keychain are usualy suffixed with .keychain. If we change we should probably clean up the ones we created
-        this.keychainName = "jenkins-"+build.getFullDisplayName().replace('/', '-');
+        this.keychainName = "jenkins-" + build.getFullDisplayName().replace('/', '-');
+    }
+
+    public String getProfileFolder(Run<?, ?> build) {
+        return build.getFullDisplayName()
+                .replace('/', '-')
+                .replace(" ", "");
     }
 
     public void generateKeychainPass(){
@@ -272,7 +282,7 @@ public class DeveloperProfileLoaderWrapper extends Builder implements SimpleBuil
     public void unload(Run<?, ?> build, FilePath filePath, Launcher launcher, TaskListener listener) throws InterruptedException, IOException {
         generateKeychainPass();
         generateKeychainName(build);
-        copyProvisionsionProfile(filePath, getSecretDir(filePath), listener);
+        copyProvisionsionProfile(filePath, getSecretDir(filePath, build), listener);
         ArgumentListBuilder args = new ArgumentListBuilder("security", "delete-keychain", this.keychainName);
         ByteArrayOutputStream output = invoke(launcher, listener, args, "Failed to remove keychain");
         listener.getLogger().write(output.toByteArray());
@@ -280,7 +290,7 @@ public class DeveloperProfileLoaderWrapper extends Builder implements SimpleBuil
                 .getHomeDirectory(filePath.getChannel())
                 .child("Library/MobileDevice/Provisioning Profiles")
                 .child(this.provisioningpProfileName).delete();
-        FilePath profilePath = this.getSecretDir(filePath, this.keychainPassword);
+        FilePath profilePath = this.getSecretDir(filePath, build);
         profilePath.deleteRecursive();
     }
 

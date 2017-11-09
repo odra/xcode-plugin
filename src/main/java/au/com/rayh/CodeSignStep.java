@@ -112,7 +112,7 @@ public class CodeSignStep extends AbstractStepImpl {
 
             CodeSignWrapper codesign = new CodeSignWrapper(appPath,
                     keychainName,
-                    profileLoader.getSecretDir(workspace),
+                    profileLoader.getSecretDir(workspace, build),
                     clean,
                     verify,
                     ipaName);
